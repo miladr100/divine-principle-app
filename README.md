@@ -1,67 +1,74 @@
-# Princípio Divino — React Native + MongoDB
+# Princípio Divino
 
-MVP inicial do aplicativo **Princípio Divino** para iOS e Android.
+Aplicativo de leitura da 7ª edição de 2014 do Princípio Divino, para Android e iOS.
 
-## Arquitetura
+O texto fica no aparelho. A leitura, a pesquisa, o áudio, os destaques e as notas funcionam sem servidor.
 
-- **Mobile:** React Native com Expo + TypeScript
-- **Navegação:** React Navigation
-- **Leitor:** `react-native-webview` para permitir seleção precisa de texto, referências clicáveis e destaque inline
-- **Offline:** SQLite (`expo-sqlite`)
-- **Áudio:** `expo-speech` (TTS por parágrafo)
-- **Estado/configurações:** Zustand + AsyncStorage
-- **Backend:** Node.js + Express + TypeScript
-- **Banco remoto:** MongoDB / MongoDB Atlas
+## Estrutura
 
-## Funcionalidades já preparadas no MVP
+- `mobile` — app Expo com React Native e TypeScript
+- `server` — API Express preparada para sincronizar dados do leitor no MongoDB. O app ainda não chama essa API
 
-- Home com Princípio do Dia, continuar leitura e progresso
-- Índice hierárquico (Parte > Capítulo > Seção)
-- Leitura vertical contínua
-- Modo de cores: vermelho / vermelho+azul / +amarelo / texto integral
-- Alternância para mostrar/ocultar cores editoriais
-- Destaque pessoal em uma única cor (rosa)
-- Seleção de trecho para destacar, salvar, adicionar nota ou compartilhar
-- Pesquisa textual local
-- Áudio por parágrafo; toque em outro parágrafo reinicia dali
-- Continuação automática para a próxima seção configurável
-- Velocidade de voz configurável
-- Salva ponto exato da leitura
-- Progresso por transição de seção
-- Referências bíblicas clicáveis em modal
-- Área “Meu Estudo”
-- Estrutura para 365 reflexões diárias
-- Sincronização futura com MongoDB
+No mobile:
 
-## Rodar o mobile
+- Navegação com React Navigation
+- Leitura em WebView, com seleção de trecho, notas de rodapé e referências bíblicas
+- SQLite para destaques, notas e progresso
+- Áudio com `expo-speech`
+- Configurações com Zustand e AsyncStorage
+
+## O que o app faz
+
+- Início com a reflexão do dia
+- Índice por parte, capítulo, seção e subseção
+- Leitura contínua, com troca de seção sem recarregar a tela
+- Introdução de capítulo mostra o nome do capítulo
+- Cores editoriais: só vermelho, vermelho e azul, até amarelo, ou texto integral
+- Aparência claro, azul e escuro, e tamanho da fonte
+- Versículo bíblico em itálico, com recuo e a referência na mesma linha ou logo abaixo
+- Toque no parágrafo para ouvir dali; velocidade da voz e opção de seguir para a próxima seção
+- Rolagem automática de 0,25x a 3x. O dedo na tela pausa a rolagem e soltar continua. No fim da seção, para ou segue
+- Busca na seção aberta e busca no livro
+- Destaque, nota e compartilhamento de um trecho
+- Meu Estudo, com a contagem do que foi guardado
+
+## Rodar o app
+
+O mobile usa Yarn.
 
 ```bash
 cd mobile
-npm install
-npx expo start
+yarn
+yarn start
 ```
 
-## Rodar o backend
+Para gerar o aplicativo Android, com ícone e recursos nativos:
+
+```bash
+cd mobile
+yarn android
+```
+
+A checagem de tipos:
+
+```bash
+cd mobile
+yarn typecheck
+```
+
+## Conteúdo do livro
+
+O texto estruturado está em `mobile/src/data/principioDivino2014.json`. Cada nó é uma parte, capítulo, seção ou subseção. Cada parágrafo tem um identificador estável, a cor editorial e as referências bíblicas.
+
+## API
+
+A API é opcional para a leitura.
 
 ```bash
 cd server
 cp .env.example .env
-npm install
-npm run dev
+yarn
+yarn dev
 ```
 
-Configure `MONGODB_URI` no `.env`.
-
-## Importação do livro
-
-O app foi preparado para receber o conteúdo estruturado em JSON/SQLite. O arquivo `mobile/src/data/bookSeed.ts` contém somente uma amostra de estrutura. O próximo passo é converter a 7ª edição de 2014 para:
-
-- parte
-- capítulo
-- seção
-- subseção
-- parágrafo
-- cor editorial (`red`, `blue`, `yellow`, `white`)
-- referências bíblicas
-
-Cada parágrafo recebe um ID permanente para áudio, retomada de leitura, notas e destaques.
+Defina `MONGODB_URI` no `.env`. A API sobe em `http://localhost:4000` e expõe `GET /health` e `/api/sync/:userId`.
