@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Princípio Divino",
+    "slug": "principio-divino",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.org.principiodivino.app"
+    },
+    "android": {
+      "package": "br.org.principiodivino.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "plugins": ["expo-sqlite"]
+  }
+}
