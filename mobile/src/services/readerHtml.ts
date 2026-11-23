@@ -1,6 +1,6 @@
 import { BookNode, Paragraph } from '../types/book';
 import { ReadingDepth } from '../state/useSettingsStore';
-import { nodeEyebrow } from '../data/bookCatalog';
+import { nodeEyebrow, trailingBibleCitation } from '../data/bookCatalog';
 import { visibleSegments } from './editorialText';
 
 export function buildReaderHtml(options: {
@@ -46,7 +46,10 @@ export function buildReaderHtml(options: {
       .join('');
 
     const tag = paragraph.role === 'heading' ? 'h2' : 'p';
-    return `<${tag} id="${paragraph.id}" data-paragraph-id="${paragraph.id}">${body}${missing}</${tag}>`;
+    const quotation = tag === 'p' && trailingBibleCitation(paragraph.text);
+    const content = quotation ? wrapVerseCitation(`${body}${missing}`) : `${body}${missing}`;
+    const klass = quotation ? ' class="verse"' : '';
+    return `<${tag}${klass} id="${paragraph.id}" data-paragraph-id="${paragraph.id}">${content}</${tag}>`;
   }).filter(Boolean).join('\n');
 
   const eyebrow = nodeEyebrow(section);
@@ -58,6 +61,8 @@ export function buildReaderHtml(options: {
     .eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#00c8ee;margin-bottom:10px;font-weight:700}
     h1{font-size:${fontSize + 9}px;line-height:1.15;margin:0 0 28px;color:${fg}}
     p{font-size:${fontSize}px;line-height:1.75;margin:0 0 22px;border-radius:8px;padding:4px 0;text-align:justify;text-align-last:start;hyphens:none;-webkit-hyphens:none;word-break:normal;overflow-wrap:normal;transition:background .2s}
+    p.verse{font-style:italic;margin-left:1.25em;text-align:start;text-align-last:start}
+    .verse-cite{white-space:nowrap}
     h2{font-size:${fontSize + 3}px;line-height:1.35;font-weight:700;margin:28px 0 12px;text-align:left;color:${fg}}
     p.speaking,h2.speaking{background:rgba(0,200,238,.13)}
     .fn-word{white-space:nowrap}
@@ -235,6 +240,12 @@ export function buildReaderHtml(options: {
       };
     </script>
   </body></html>`;
+}
+
+function wrapVerseCitation(html: string) {
+  const dash = html.lastIndexOf('—');
+  if (dash < 0) return html;
+  return `${html.slice(0, dash)}<span class="verse-cite">${html.slice(dash)}</span>`;
 }
 
 function notesByNumber(paragraph: Paragraph) {

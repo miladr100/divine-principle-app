@@ -104,6 +104,21 @@ function isSubheading(text: string) {
   return value.length > 0 && value.length < 160 && NUMBERED_HEADING.test(value);
 }
 
+const BIBLE_CITE = /—\s*(?:[1-3]\s+|I{1,3}\s+|IV\s+)?[\p{Lu}][\p{L}.]*\s*\d+\s*:\s*\d[\d\s,.:–-]*?(?:\s+e\s+\d+)?(?:\s+cf\.\s+[\p{L}.]+\s*\d+\s*:\s*\d+(?:-\d+)?)?\.?\s*$/u;
+
+export function trailingBibleCitation(text: string) {
+  const value = text.trim();
+  const match = value.match(BIBLE_CITE);
+  if (!match || match.index === undefined || match.index <= 0) return null;
+  return { quote: value.slice(0, match.index).trimEnd(), cite: match[0].trim() };
+}
+
+function isStandaloneBibleCitation(text: string) {
+  const value = text.trim();
+  const match = value.match(BIBLE_CITE);
+  return !!match && match.index === 0;
+}
+
 function normalizeParagraph(paragraph: Paragraph) {
   paragraph.segments = paragraph.segments.map((segment) => ({
     ...segment,
@@ -199,7 +214,8 @@ function repairParagraphs(ordered: Paragraph[], byId: Map<string, BookNode>) {
       index += 1;
       continue;
     }
-    const mode = mergeMode(current, next);
+    const citation = isStandaloneBibleCitation(next.text) && current.sectionId === next.sectionId && current.role !== 'heading';
+    const mode = citation ? 'space' : mergeMode(current, next);
     if (!mode) {
       index += 1;
       continue;

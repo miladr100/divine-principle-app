@@ -309,7 +309,7 @@ export function ReaderScreen() {
           <Text style={[styles.stepIcon, ink, !previous && styles.disabled]}>‹</Text>
         </TouchableOpacity>
         <View style={[styles.locationPill, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.location, ink]} numberOfLines={1}>{nodeLabel(section)}</Text>
+          <Text style={[styles.location, ink]} numberOfLines={1} ellipsizeMode="tail">{nodeLabel(section)}</Text>
         </View>
         <TouchableOpacity style={styles.step} disabled={!next} onPress={() => next && goToSection(next.id, true)} accessibilityLabel="Próxima seção">
           <Text style={[styles.stepIcon, ink, !next && styles.disabled]}>›</Text>
@@ -427,8 +427,8 @@ const styles = StyleSheet.create({
   step: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepIcon: { color: '#dff5ff', fontSize: 30, fontWeight: '500' },
   disabled: { color: '#3d6270' },
-  locationPill: { flex: 1, backgroundColor: '#0b3040', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: 4 },
-  location: { color: '#eaf8ff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  locationPill: { flex: 1, minWidth: 0, backgroundColor: '#0b3040', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: 4, justifyContent: 'center' },
+  location: { color: '#eaf8ff', fontSize: 14, fontWeight: '700', textAlign: 'center', lineHeight: 18 },
   tabRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#113b49', paddingTop: 6 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 4 },
   tabIcon: { color: '#9ed6e8', fontSize: 18 },
