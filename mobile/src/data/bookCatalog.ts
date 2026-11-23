@@ -385,6 +385,21 @@ export function nodeLabel(node: BookNode) {
   return node.title;
 }
 
+function coverChapter(node: BookNode) {
+  if (node.type !== 'introduction') return undefined;
+  return [...getBreadcrumb(node.id)].reverse().find((item) => item.type === 'chapter');
+}
+
+export function readerHeading(node: BookNode) {
+  const chapter = coverChapter(node);
+  return chapter ? nodeLabel(chapter) : node.title;
+}
+
+export function readerLocation(node: BookNode) {
+  const chapter = coverChapter(node);
+  return chapter ? nodeLabel(chapter) : nodeLabel(node);
+}
+
 export function nodeEyebrow(node: BookNode) {
   if (node.type === 'preface') return 'Prefácio';
   if (node.type === 'introduction') return 'Introdução';

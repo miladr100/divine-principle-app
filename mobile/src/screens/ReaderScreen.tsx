@@ -6,9 +6,9 @@ import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import { RootStackParamList, TabParamList } from '../navigation/types';
-import { buildReaderHtml } from '../services/readerHtml';
+import { buildReaderHtml, readerArticleHtml } from '../services/readerHtml';
 import { getNextSection, getPreviousReadableSection, getSection } from '../services/bookService';
-import { nodeLabel } from '../data/bookCatalog';
+import { readerLocation } from '../data/bookCatalog';
 import { visibleParagraphText } from '../services/editorialText';
 import { addHighlight, addNote, markPreviousSectionCompleted, saveLastParagraph } from '../db/database';
 import { useSettingsStore } from '../state/useSettingsStore';
@@ -43,6 +43,7 @@ export function ReaderScreen() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [audioOpen, setAudioOpen] = useState(false);
+  const [scrollOpen, setScrollOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pageQuery, setPageQuery] = useState('');
   const [findIndex, setFindIndex] = useState(0);
@@ -76,25 +77,56 @@ export function ReaderScreen() {
     }).start();
   }, [chromeVisible, chromeHeight, chromeY]);
 
-  const html = useMemo(() => section ? buildReaderHtml({
+  const styleKey = `${settings.fontSize}|${settings.showEditorialColors}|${settings.readingDepth}|${settings.appearance}`;
+  const styleKeyRef = useRef(styleKey);
+  const mountedSectionRef = useRef(section?.id ?? '');
+  const webReadyRef = useRef(false);
+  const sectionRef = useRef(section);
+  sectionRef.current = section;
+  const [sourceHtml, setSourceHtml] = useState(() => section ? buildReaderHtml({
     section,
     fontSize: settings.fontSize,
     showEditorialColors: settings.showEditorialColors,
     readingDepth: settings.readingDepth,
-    darkMode: settings.darkMode
-  }) : '', [section, settings.fontSize, settings.showEditorialColors, settings.readingDepth, settings.darkMode]);
+    appearance: settings.appearance
+  }) : '');
+  const [webVisible, setWebVisible] = useState(false);
+  const webSource = useMemo(() => ({ html: sourceHtml }), [sourceHtml]);
+
+  useEffect(() => {
+    const current = getSection(route.params.sectionId);
+    if (!current) return;
+    const options = {
+      section: current,
+      fontSize: settings.fontSize,
+      showEditorialColors: settings.showEditorialColors,
+      readingDepth: settings.readingDepth,
+      appearance: settings.appearance
+    };
+    if (styleKeyRef.current !== styleKey) {
+      styleKeyRef.current = styleKey;
+      webReadyRef.current = false;
+      setWebVisible(false);
+      mountedSectionRef.current = current.id;
+      setSourceHtml(buildReaderHtml(options));
+      return;
+    }
+    if (mountedSectionRef.current === current.id || !webReadyRef.current) return;
+    mountedSectionRef.current = current.id;
+    webRef.current?.injectJavaScript(`window.__replaceReader(${JSON.stringify(readerArticleHtml(options))}); true;`);
+  }, [route.params.sectionId, styleKey, settings.fontSize, settings.showEditorialColors, settings.readingDepth, settings.appearance]);
 
   useEffect(() => {
     const px = Math.round(32 * settings.scrollSpeed);
     webRef.current?.injectJavaScript(`window.__setAutoScroll && window.__setAutoScroll(${settings.autoScroll}, ${px}); true;`);
-  }, [settings.autoScroll, settings.scrollSpeed, html]);
+  }, [settings.autoScroll, settings.scrollSpeed]);
 
   useEffect(() => {
     const script = !searchOpen || pageQuery.trim().length < 2
       ? 'window.__clearFind && window.__clearFind(); true;'
       : `window.__find && window.__find(${JSON.stringify(pageQuery)}, ${findIndex}); true;`;
     webRef.current?.injectJavaScript(script);
-  }, [searchOpen, pageQuery, findIndex, html]);
+  }, [searchOpen, pageQuery, findIndex, route.params.sectionId]);
 
   const spokenParagraphs = useMemo(() => (section?.paragraphs ?? [])
     .map((paragraph) => ({ paragraph, text: visibleParagraphText(paragraph, settings.readingDepth) }))
@@ -130,7 +162,7 @@ export function ReaderScreen() {
         clearSpeaking();
         if (settings.autoContinueSection) {
           const next = getNextSection(section.id);
-          if (next) navigation.replace('Reader', { sectionId: next.id, previousSectionId: section.id });
+          if (next && section) navigation.setParams({ sectionId: next.id, previousSectionId: section.id });
         }
         return;
       }
@@ -192,7 +224,7 @@ export function ReaderScreen() {
 
   const goToSection = (sectionId: string, markCurrentRead: boolean) => {
     pause();
-    navigation.replace('Reader', {
+    navigation.setParams({
       sectionId,
       previousSectionId: markCurrentRead ? section.id : undefined
     });
@@ -223,6 +255,11 @@ export function ReaderScreen() {
       {searchOpen ? null : (
         <TouchableOpacity style={styles.iconButton} onPress={() => setAudioOpen(true)} accessibilityLabel="Opções de áudio">
           <Text style={[styles.icon, ink]}>♫</Text>
+        </TouchableOpacity>
+      )}
+      {searchOpen ? null : (
+        <TouchableOpacity style={styles.iconButton} onPress={() => setScrollOpen(true)} accessibilityLabel="Opções de rolagem">
+          <Text style={[styles.icon, settings.autoScroll ? { color: colors.accent } : ink]}>↕</Text>
         </TouchableOpacity>
       )}
       {searchOpen ? (
@@ -257,13 +294,27 @@ export function ReaderScreen() {
     <WebView
       ref={webRef}
       originWhitelist={['*']}
-      source={{ html }}
+      source={webSource}
       onLoadEnd={() => {
+        webReadyRef.current = true;
+        setWebVisible(true);
+        const current = sectionRef.current;
+        if (current && mountedSectionRef.current !== current.id) {
+          mountedSectionRef.current = current.id;
+          webRef.current?.injectJavaScript(`window.__replaceReader(${JSON.stringify(readerArticleHtml({
+            section: current,
+            fontSize: settings.fontSize,
+            showEditorialColors: settings.showEditorialColors,
+            readingDepth: settings.readingDepth,
+            appearance: settings.appearance
+          }))}); true;`);
+        }
         const { autoScroll, scrollSpeed } = useSettingsStore.getState();
         const px = Math.round(32 * scrollSpeed);
         webRef.current?.injectJavaScript(`window.__setAutoScroll && window.__setAutoScroll(${autoScroll}, ${px}); true;`);
       }}
-      style={[styles.web, { backgroundColor: colors.bg }]}
+      style={[styles.web, { backgroundColor: colors.bg, opacity: webVisible ? 1 : 0 }]}
+      containerStyle={{ backgroundColor: colors.bg }}
       onMessage={(event) => {
         try {
           const msg = JSON.parse(event.nativeEvent.data);
@@ -285,7 +336,6 @@ export function ReaderScreen() {
               return visible;
             });
           }
-          if (msg.type === 'autoScrollPaused') settings.setAutoScroll(false);
           if (msg.type === 'autoScrollEnd') {
             if (settings.scrollAtEnd === 'next' && next) {
               goToSection(next.id, true);
@@ -309,7 +359,7 @@ export function ReaderScreen() {
           <Text style={[styles.stepIcon, ink, !previous && styles.disabled]}>‹</Text>
         </TouchableOpacity>
         <View style={[styles.locationPill, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.location, ink]} numberOfLines={1} ellipsizeMode="tail">{nodeLabel(section)}</Text>
+          <Text style={[styles.location, ink]} numberOfLines={1} ellipsizeMode="tail">{readerLocation(section)}</Text>
         </View>
         <TouchableOpacity style={styles.step} disabled={!next} onPress={() => next && goToSection(next.id, true)} accessibilityLabel="Próxima seção">
           <Text style={[styles.stepIcon, ink, !next && styles.disabled]}>›</Text>
@@ -338,24 +388,40 @@ export function ReaderScreen() {
               <Text style={[styles.audioActionText, ink]}>Parar</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.speedLabel, { color: colors.muted }]}>Rolagem automática</Text>
+          <Text style={[styles.speedLabel, { color: colors.muted }]}>Velocidade do áudio</Text>
+          <View style={styles.speedRow}>
+            {SPEEDS.map((rate) => (
+              <TouchableOpacity key={rate} style={[styles.speedPill, { borderColor: colors.border }, settings.speechRate === rate && { backgroundColor: colors.read }]} onPress={() => settings.setSpeechRate(rate)}>
+                <Text style={[styles.speedText, ink]}>{rate}x</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+
+    <Modal visible={scrollOpen} transparent animationType="slide" onRequestClose={() => setScrollOpen(false)}>
+      <Pressable style={styles.sheetOverlay} onPress={() => setScrollOpen(false)}>
+        <Pressable style={[styles.audioSheet, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => undefined}>
+          <Text style={[styles.modalTitle, { color: colors.accent }]}>Rolagem</Text>
           <TouchableOpacity
-            style={[styles.audioAction, { backgroundColor: colors.read, marginBottom: 8 }]}
+            style={[styles.scrollToggle, { backgroundColor: colors.read }]}
             onPress={() => {
               const nextValue = !settings.autoScroll;
               settings.setAutoScroll(nextValue);
-              if (nextValue) setAudioOpen(false);
+              if (nextValue) setScrollOpen(false);
             }}
           >
             <Text style={[styles.audioActionText, ink]}>{settings.autoScroll ? 'Parar rolagem' : 'Iniciar rolagem'}</Text>
           </TouchableOpacity>
           <Text style={[styles.speedLabel, { color: colors.muted }]}>Velocidade da rolagem</Text>
           <View style={styles.speedRow}>
-            <TouchableOpacity style={[styles.speedPill, { borderColor: colors.border }]} onPress={() => settings.setScrollSpeed(Math.round(Math.min(3, Math.max(0.5, settings.scrollSpeed - 0.25)) * 100) / 100)}>
+            <TouchableOpacity style={[styles.speedPill, { borderColor: colors.border }]} onPress={() => settings.setScrollSpeed(Math.round(Math.min(3, Math.max(0.25, settings.scrollSpeed - 0.25)) * 100) / 100)}>
               <Text style={[styles.speedText, ink]}>−</Text>
             </TouchableOpacity>
             <Text style={[styles.scrollValue, ink]}>{Number(settings.scrollSpeed.toFixed(2))}x</Text>
-            <TouchableOpacity style={[styles.speedPill, { borderColor: colors.border }]} onPress={() => settings.setScrollSpeed(Math.round(Math.min(3, Math.max(0.5, settings.scrollSpeed + 0.25)) * 100) / 100)}>
+            <TouchableOpacity style={[styles.speedPill, { borderColor: colors.border }]} onPress={() => settings.setScrollSpeed(Math.round(Math.min(3, Math.max(0.25, settings.scrollSpeed + 0.25)) * 100) / 100)}>
               <Text style={[styles.speedText, ink]}>+</Text>
             </TouchableOpacity>
           </View>
@@ -368,15 +434,6 @@ export function ReaderScreen() {
               <Text style={[styles.speedText, ink]}>Próxima página</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.speedLabel, { color: colors.muted }]}>Velocidade do áudio</Text>
-          <View style={styles.speedRow}>
-            {SPEEDS.map((rate) => (
-              <TouchableOpacity key={rate} style={[styles.speedPill, { borderColor: colors.border }, settings.speechRate === rate && { backgroundColor: colors.read }]} onPress={() => settings.setSpeechRate(rate)}>
-                <Text style={[styles.speedText, ink]}>{rate}x</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -442,6 +499,7 @@ const styles = StyleSheet.create({
   close: { color: '#00c8ee', fontWeight: '700', marginTop: 18 },
   audioActions: { flexDirection: 'row', marginBottom: 8 },
   audioAction: { flex: 1, backgroundColor: '#0b4658', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginRight: 8 },
+  scrollToggle: { backgroundColor: '#0b4658', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   audioActionText: { color: '#eaf8ff', fontSize: 16, fontWeight: '700' },
   speedLabel: { color: '#7fa6b5', marginTop: 16, marginBottom: 8 },
   speedRow: { flexDirection: 'row', flexWrap: 'wrap' },

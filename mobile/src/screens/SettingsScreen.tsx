@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { ReadingDepth, useSettingsStore } from '../state/useSettingsStore';
+import { Appearance, ReadingDepth, useSettingsStore } from '../state/useSettingsStore';
 import { usePalette } from '../theme/palette';
 
 export function SettingsScreen() {
@@ -16,12 +16,15 @@ export function SettingsScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={styles.content}>
       <Text style={[styles.heading, { color: colors.accent }]}>Aparência</Text>
       <View style={styles.wrap}>
-        <TouchableOpacity style={[styles.pill, { borderColor: colors.border }, !s.darkMode && { backgroundColor: colors.surface }]} onPress={() => s.setDarkMode(false)}>
-          <Text style={[styles.pillText, { color: colors.text }]}>Claro</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.pill, { borderColor: colors.border }, s.darkMode && { backgroundColor: colors.surface }]} onPress={() => s.setDarkMode(true)}>
-          <Text style={[styles.pillText, { color: colors.text }]}>Escuro</Text>
-        </TouchableOpacity>
+        {([
+          ['light', 'Claro'],
+          ['blue', 'Azul'],
+          ['dark', 'Escuro']
+        ] as [Appearance, string][]).map(([key, label]) => (
+          <TouchableOpacity key={key} style={[styles.pill, { borderColor: colors.border }, s.appearance === key && { backgroundColor: colors.surface }]} onPress={() => s.setAppearance(key)}>
+            <Text style={[styles.pillText, { color: colors.text }]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
       <Text style={[styles.heading, { color: colors.accent }]}>Leitura</Text>
       <View style={[styles.row, { borderBottomColor: colors.line }]}>

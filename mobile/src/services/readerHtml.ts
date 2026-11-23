@@ -1,21 +1,20 @@
 import { BookNode, Paragraph } from '../types/book';
-import { ReadingDepth } from '../state/useSettingsStore';
-import { nodeEyebrow, trailingBibleCitation } from '../data/bookCatalog';
+import { Appearance, ReadingDepth } from '../state/useSettingsStore';
+import { nodeEyebrow, readerHeading, trailingBibleCitation } from '../data/bookCatalog';
+import { palette } from '../theme/palette';
 import { visibleSegments } from './editorialText';
 
-export function buildReaderHtml(options: {
+type ReaderHtmlOptions = {
   section: BookNode;
   fontSize: number;
   showEditorialColors: boolean;
   readingDepth: ReadingDepth;
-  darkMode: boolean;
-}) {
-  const { section, fontSize, showEditorialColors, readingDepth, darkMode } = options;
+  appearance: Appearance;
+};
 
-  const bg = darkMode ? '#031f2b' : '#fbf7ee';
-  const fg = darkMode ? '#eaf8ff' : '#18232a';
-  const link = darkMode ? '#00c8ee' : '#007f9a';
-  const muted = darkMode ? '#7fa6b5' : '#6f777b';
+export function readerArticleHtml(options: ReaderHtmlOptions) {
+  const { section, showEditorialColors, readingDepth, appearance } = options;
+  const fg = palette(appearance).text;
   const colorMap: Record<string, string> = {
     red: '#ff6b6b',
     blue: '#48b7ff',
@@ -53,11 +52,25 @@ export function buildReaderHtml(options: {
   }).filter(Boolean).join('\n');
 
   const eyebrow = nodeEyebrow(section);
+  return `<div class="eyebrow">${escapeHtml(eyebrow)}</div>
+    <h1>${escapeHtml(readerHeading(section))}</h1>
+    <div class="hint">Toque em um parágrafo para ouvir a partir dele. Selecione um trecho para estudar.</div>
+    ${htmlParagraphs || '<p>Não há texto neste nível de leitura.</p>'}`;
+}
+
+export function buildReaderHtml(options: ReaderHtmlOptions) {
+  const { fontSize, appearance } = options;
+  const colors = palette(appearance);
+  const bg = colors.bg;
+  const fg = colors.text;
+  const link = colors.link;
+  const muted = colors.muted;
+  const article = readerArticleHtml(options);
 
   return `<!DOCTYPE html>
   <html lang="pt-BR"><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <style>
-    *{box-sizing:border-box} body{margin:0;padding:24px 20px 210px;background:${bg};color:${fg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    *{box-sizing:border-box} html,body{background:${bg}} body{margin:0;padding:24px 20px 210px;color:${fg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
     .eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#00c8ee;margin-bottom:10px;font-weight:700}
     h1{font-size:${fontSize + 9}px;line-height:1.15;margin:0 0 28px;color:${fg}}
     p{font-size:${fontSize}px;line-height:1.75;margin:0 0 22px;border-radius:8px;padding:4px 0;text-align:justify;text-align-last:start;hyphens:none;-webkit-hyphens:none;word-break:normal;overflow-wrap:normal;transition:background .2s}
@@ -76,32 +89,32 @@ export function buildReaderHtml(options: {
     ::selection{background:#ff72b6;color:#10212a}
   </style></head>
   <body>
-    <div class="eyebrow">${escapeHtml(eyebrow)}</div>
-    <h1>${escapeHtml(section.title)}</h1>
-    <div class="hint">Toque em um parágrafo para ouvir a partir dele. Selecione um trecho para estudar.</div>
-    ${htmlParagraphs || '<p>Não há texto neste nível de leitura.</p>'}
+    <div id="reader-root">${article}</div>
     <script>
       const send = (payload) => window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-      document.querySelectorAll('[data-paragraph-id]').forEach((p) => {
-        p.addEventListener('click', (e) => {
-          if (e.target.closest && e.target.closest('.fn-link, .bible-ref')) return;
-          const selection = window.getSelection();
-          if (selection && selection.toString().trim().length > 0) return;
-          send({ type:'paragraphTap', paragraphId:p.dataset.paragraphId });
+      function bindContent() {
+        document.querySelectorAll('[data-paragraph-id]').forEach((p) => {
+          p.addEventListener('click', (e) => {
+            if (e.target.closest && e.target.closest('.fn-link, .bible-ref')) return;
+            const selection = window.getSelection();
+            if (selection && selection.toString().trim().length > 0) return;
+            send({ type:'paragraphTap', paragraphId:p.dataset.paragraphId });
+          });
         });
-      });
-      document.querySelectorAll('.fn-link').forEach((a) => {
-        a.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          send({ type:'footnote', number:a.dataset.fnNumber, text:a.dataset.fnText });
+        document.querySelectorAll('.fn-link').forEach((a) => {
+          a.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            send({ type:'footnote', number:a.dataset.fnNumber, text:a.dataset.fnText });
+          });
         });
-      });
-      document.querySelectorAll('.bible-ref').forEach((a) => {
-        a.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          send({ type:'bibleRef', refId:a.dataset.refId, label:a.dataset.label, text:a.dataset.text });
+        document.querySelectorAll('.bible-ref').forEach((a) => {
+          a.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            send({ type:'bibleRef', refId:a.dataset.refId, label:a.dataset.label, text:a.dataset.text });
+          });
         });
-      });
+      }
+      bindContent();
       function emitSelection(){
         const sel = window.getSelection();
         if (!sel || sel.rangeCount === 0) return;
@@ -200,17 +213,21 @@ export function buildReaderHtml(options: {
       };
       let autoScrollFrame = 0;
       let autoScrollPx = 32;
-      window.__setAutoScroll = (enabled, px) => {
-        autoScrollPx = Number(px) || 32;
-        if (!enabled) {
-          if (autoScrollFrame) cancelAnimationFrame(autoScrollFrame);
-          autoScrollFrame = 0;
-          return;
-        }
-        if (autoScrollFrame) return;
+      let autoScrollEnabled = false;
+      let autoScrollTouches = 0;
+      const stopAutoScrollLoop = () => {
+        if (autoScrollFrame) cancelAnimationFrame(autoScrollFrame);
+        autoScrollFrame = 0;
+      };
+      const startAutoScrollLoop = () => {
+        if (!autoScrollEnabled || autoScrollTouches > 0 || autoScrollFrame) return;
         let last = performance.now();
         let ended = false;
         const tick = (now) => {
+          if (!autoScrollEnabled || autoScrollTouches > 0) {
+            autoScrollFrame = 0;
+            return;
+          }
           const dt = Math.min(50, now - last);
           last = now;
           const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
@@ -228,11 +245,33 @@ export function buildReaderHtml(options: {
         };
         autoScrollFrame = requestAnimationFrame(tick);
       };
-      document.addEventListener('touchstart', () => {
-        if (!autoScrollFrame) return;
-        window.__setAutoScroll(false, autoScrollPx);
-        send({ type:'autoScrollPaused' });
-      }, { passive: true });
+      window.__setAutoScroll = (enabled, px) => {
+        autoScrollPx = Number(px) || 32;
+        autoScrollEnabled = !!enabled;
+        if (!autoScrollEnabled) {
+          stopAutoScrollLoop();
+          return;
+        }
+        startAutoScrollLoop();
+      };
+      const syncAutoScrollHold = (event) => {
+        autoScrollTouches = event.touches ? event.touches.length : 0;
+        if (autoScrollTouches > 0) stopAutoScrollLoop();
+        else startAutoScrollLoop();
+      };
+      document.addEventListener('touchstart', syncAutoScrollHold, { passive: true });
+      document.addEventListener('touchend', syncAutoScrollHold, { passive: true });
+      document.addEventListener('touchcancel', syncAutoScrollHold, { passive: true });
+      window.__replaceReader = (html) => {
+        const root = document.getElementById('reader-root');
+        if (!root) return;
+        root.innerHTML = html;
+        window.scrollTo(0, 0);
+        lastScrollY = 0;
+        lastScrollMode = '';
+        bindContent();
+        startAutoScrollLoop();
+      };
       window.__setSpeaking = (paragraphId) => {
         document.querySelectorAll('.speaking').forEach((p) => p.classList.remove('speaking'));
         const el = document.getElementById(paragraphId);

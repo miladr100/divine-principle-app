@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type ReadingDepth = 'red' | 'blue' | 'yellow' | 'full';
 export type ScrollAtEnd = 'stop' | 'next';
+export type Appearance = 'light' | 'blue' | 'dark';
 
 type SettingsState = {
   fontSize: number;
@@ -11,7 +12,7 @@ type SettingsState = {
   autoContinueSection: boolean;
   showEditorialColors: boolean;
   readingDepth: ReadingDepth;
-  darkMode: boolean;
+  appearance: Appearance;
   likedDays: number[];
   autoScroll: boolean;
   scrollSpeed: number;
@@ -21,7 +22,7 @@ type SettingsState = {
   setAutoContinueSection: (value: boolean) => void;
   setShowEditorialColors: (value: boolean) => void;
   setReadingDepth: (value: ReadingDepth) => void;
-  setDarkMode: (value: boolean) => void;
+  setAppearance: (value: Appearance) => void;
   toggleLikedDay: (day: number) => void;
   setAutoScroll: (value: boolean) => void;
   setScrollSpeed: (value: number) => void;
@@ -36,7 +37,7 @@ export const useSettingsStore = create<SettingsState>()(
       autoContinueSection: true,
       showEditorialColors: true,
       readingDepth: 'full',
-      darkMode: true,
+      appearance: 'blue',
       likedDays: [],
       autoScroll: false,
       scrollSpeed: 1,
@@ -46,7 +47,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoContinueSection: (autoContinueSection) => set({ autoContinueSection }),
       setShowEditorialColors: (showEditorialColors) => set({ showEditorialColors }),
       setReadingDepth: (readingDepth) => set({ readingDepth }),
-      setDarkMode: (darkMode) => set({ darkMode }),
+      setAppearance: (appearance) => set({ appearance }),
       setAutoScroll: (autoScroll) => set({ autoScroll }),
       setScrollSpeed: (scrollSpeed) => set({ scrollSpeed }),
       setScrollAtEnd: (scrollAtEnd) => set({ scrollAtEnd }),
@@ -59,7 +60,14 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'pd-settings',
-      storage: createJSONStorage(() => AsyncStorage)
+      storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persistedState, version) => {
+        const state = { ...(persistedState as { darkMode?: boolean; appearance?: Appearance } | null) };
+        if (version < 1 && state.appearance == null) state.appearance = state.darkMode === false ? 'light' : 'blue';
+        delete state.darkMode;
+        return state;
+      }
     }
   )
 );

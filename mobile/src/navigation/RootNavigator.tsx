@@ -50,7 +50,7 @@ export function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
-      <Stack.Screen name="Reader" component={ReaderScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Reader" component={ReaderScreen} options={{ headerShown: false, animation: 'none' }} />
     </Stack.Navigator>
   );
 }
